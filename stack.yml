@@ -145,6 +145,34 @@ services:
       restart_policy:
         condition: any
 
+
+  # PostgreSQL Exporter (optional — enable via Web UI Settings)
+  to-postgres:
+    image: ghcr.io/sandun-s/industrial-iot-observability-stack/to-postgres:latest
+    networks:
+      - iiot-net
+    ports:
+      - target: 8089
+        published: 8089
+        protocol: tcp
+        mode: host
+    environment:
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_DB: iiot
+      POSTGRES_URL: ""
+      SYNC_INTERVAL: "60"
+      SITE: default
+      API_PORT: "8089"
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          memory: 64M
+      restart_policy:
+        condition: any
   mqtt-reader-example:
     image: ghcr.io/sandun-s/industrial-iot-observability-stack/mqtt-reader:latest
     networks:

@@ -86,6 +86,22 @@ services:
       CONFIG_DIR: /configs
     restart: unless-stopped
 
+  # ── PostgreSQL Exporter (optional — enable via Web UI Settings) ─────────
+  to-postgres:
+    image: ghcr.io/sandun-s/industrial-iot-observability-stack/to-postgres:latest
+    networks:
+      - iiot-net
+    ports:
+      - "8089:8089"
+    environment:
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_DB: iiot
+      POSTGRES_URL: ""
+      SYNC_INTERVAL: "60"
+      SITE: default
+      API_PORT: "8089"
+    restart: unless-stopped
+
   # ── MQTT Reader: Example ────────────────────────────────────────────────
   mqtt-reader-example:
     image: ghcr.io/sandun-s/industrial-iot-observability-stack/mqtt-reader:latest

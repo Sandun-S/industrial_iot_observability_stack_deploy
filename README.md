@@ -1,134 +1,180 @@
-# Industrial IoT Observability Stack — Deploy
+# Industrial IoT Observability Stack
 
-**One-command setup** for the Industrial IoT Observability Stack.
+**Turn MQTT sensor data into live Grafana dashboards — in one command.**
 
-This repository contains everything you need to deploy the IIoT stack on any Linux server or Raspberry Pi running Docker. No source code — just configuration and scripts.
+This is an open-source observability stack for industrial IoT and homelab use. Connect any MQTT-enabled device or sensor, and within minutes you'll have time-series storage, auto-generated dashboards, and a web UI to manage everything — no cloud, no vendor lock-in, no monthly fees.
 
-[![GitHub release](https://img.shields.io/github/v/release/Sandun-S/industrial-iot-observability-stack)](https://github.com/Sandun-S/industrial-iot-observability-stack/releases)
+## What It Does
+
+```
+Your MQTT Devices → Mosquitto → MQTT Reader → InfluxDB → Grafana Dashboards
+                                              ↑               ↑
+                                         Web UI manages    Auto-created
+                                         sensors & topics   per measurement
+```
+
+- **Ingest** MQTT data from any device (JSON or CSV payloads)
+- **Store** everything in InfluxDB — a purpose-built time-series database
+- **Visualize** with Grafana — dashboards auto-created per measurement
+- **Manage** from a browser-based Web UI — add sensors, MQTT endpoints, view latest readings
+- **Runs anywhere** — Raspberry Pi, home server, cloud VM. Docker Swarm or plain Compose.
+
+> **📡 Currently supports MQTT.** More protocols (Modbus, OPC-UA, SNMP, HTTP) planned for future releases.
+
+## Two Ways to Get MQTT Data
+
+This stack works both ways — pick the one that fits your setup:
+
+| Mode | How it works | When to use |
+|------|-------------|-------------|
+| **Built-in broker** | Stack includes Mosquitto. Your devices publish data **to us**. Reader subscribes locally. | You're starting fresh, no existing MQTT infrastructure. |
+| **External broker** | Point our MQTT Reader at your existing broker. It subscribes to topics **from you**. | You already have Mosquitto/EMQX/VerneMQ/HiveMQ running somewhere. |
+
+Both modes are configured the same way — just set the broker URL when adding a reader in the Web UI:
+- Built-in: `tcp://mosquitto:1883` (default, uses the included Mosquitto)
+- External: `tcp://192.168.1.100:1883` (your existing broker)
+
+### Can external devices reach the built-in broker?
+
+**Yes.** Port 1883 is published to the host, so any device on the same network can publish to `<host-ip>:1883`.
+
+| Scenario | Setup needed |
+|----------|-------------|
+| Devices on same LAN | Nothing — just point them at `<host-ip>:1883` |
+| Devices on different network | Port forward TCP 1883 on your router, or use a VPN (Tailscale/WireGuard) |
+| Cellular / LoRa / remote devices | Use **External broker** mode — point our MQTT Reader at a cloud broker (e.g. HiveMQ, EMQX Cloud) |
+
+> ⚠️ The built-in Mosquitto has no authentication enabled. Only expose port 1883 to the internet if you're on a trusted network.
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/Sandun-S/industrial-iot-observability-stack-deploy.git
-cd industrial-iot-observability-stack-deploy
+git clone https://github.com/Sandun-S/industrial_iot_observability_stack_deploy.git
+cd industrial_iot_observability_stack_deploy
 ./scripts/setup.sh
 ```
 
-That's it. After 2-3 minutes you'll have:
-- **Web UI** at `http://<your-ip>:8080`
-- **Grafana** at `http://<your-ip>:3000` (admin / admin)
-- **InfluxDB** at `http://<your-ip>:8086`
-- **MQTT Broker** at `<your-ip>:1883`
+After 2-3 minutes:
 
-## What Gets Deployed
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| **Web UI** | `http://<your-ip>:8080` | No auth |
+| **Grafana** | `http://<your-ip>:3000` | admin / admin |
+| **InfluxDB** | `http://<your-ip>:8086` | No auth (db: iiot) |
+| **MQTT Broker** | `<your-ip>:1883` | No auth |
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| Mosquitto | 1883, 9001 | MQTT broker + WebSocket |
-| InfluxDB | 8086 | Time-series database |
-| Grafana | 3000 | Dashboards and visualization |
-| Web UI | 8080 | Management interface |
-| MQTT Reader | — | Subscribes MQTT topics → InfluxDB |
+### Screenshots
+
+| Web UI Dashboard | Sensor Management | Auto-Created Grafana Dashboard |
+|:---:|:---:|:---:|
+| ![Web UI](screenshots/localhost_8080.PNG) | ![Sensors](screenshots/sensors.PNG) | ![Grafana](screenshots/grafana.PNG) |
 
 ## Requirements
 
-- **Docker** 20.10+ (with Swarm mode for multi-node, or Docker Compose for single host)
-- **Linux** (amd64 or arm64 — Raspberry Pi 3/4/5 supported)
+- **Linux** server or Raspberry Pi (amd64 / arm64 / armv7)
+- **Docker** (auto-installed if missing — fresh OS is fine)
 - 512MB+ RAM, 2GB+ disk
 
-## Raspberry Pi Setup
+---
+
+## First Steps After Setup
+
+### 1. Enable dashboard auto-creation (one-time)
+
+Open Grafana → create a service account token so the Web UI can auto-create dashboards:
+
+1. `http://<your-ip>:3000` → login `admin` / `admin`
+2. **Administration** → **Users and access** → **Service accounts**
+3. **Add service account** → Display name: `Admin role` → Role: **Admin** → **Create**
+4. **Add service account token** → **Generate token** → copy it
+5. Open Web UI → ⚡ Settings → paste token → Save
+
+### 2. Add your MQTT sensors
+
+Open `http://<your-ip>:8080` → **📡 MQTT Readers**:
+
+- Click **+ Add Reader** → fill in your MQTT broker URL, name it
+- Click **🔍 Sensors** on the reader → **+ Add Sensor**
+- For each sensor: give it a name, MQTT topic, measurement name, and field mapping
+
+Everything is done from the browser. No YAML files, no SSH.
+
+> 📖 **Detailed guide:** See [GUIDE.md](GUIDE.md) for field-by-field explanations, JSON path mapping examples, CSV setup, wildcard topics, and troubleshooting.
+
+### 3. Publish data
+
+Point your devices at `<your-ip>:1883`, or test manually:
 
 ```bash
-# 1. Install Raspberry Pi OS (64-bit recommended)
-# 2. Install Docker
-curl -fsSL https://get.docker.com | bash
-sudo usermod -aG docker $USER
-# Log out and back in
+# Install mosquitto client (for testing)
+sudo apt install mosquitto-clients -y
 
-# 3. Clone and run
-git clone https://github.com/Sandun-S/industrial-iot-observability-stack-deploy.git
-cd industrial-iot-observability-stack-deploy
-./scripts/setup.sh
-```
-
-## Adding MQTT Readers
-
-Create a YAML config file for each MQTT broker/endpoint:
-
-```bash
-# Copy the example
-cp config/mqtt-reader-example.yaml config/my-reader.yaml
-# Edit it with your broker details and sensors
-
-# Add it to the stack
-./scripts/add-reader.sh config/my-reader.yaml
-```
-
-See `config/mqtt-reader-example.yaml` for the config format reference.
-
-## Testing
-
-Publish test data to verify the pipeline:
-
-```bash
 # Publish a test reading
-mosquitto_pub -h localhost -t 'iiot/test' -m '{"value": 23.5, "unit": "C"}'
+mosquitto_pub -h localhost -t 'iiot/test' -m '{"value": 42.5}'
+```
 
-# Or use the simulator
+### 4. Create dashboards
+
+Once data is flowing, Web UI Dashboard → **✨ Auto-Create Dashboards** → opens in Grafana.
+
+---
+
+## MQTT Simulator (for testing)
+
+Generates fake temperature, humidity, and power data so you can test the full pipeline without real hardware:
+
+```bash
+# Install dependencies (Debian/Ubuntu)
+sudo apt install python3-paho-mqtt mosquitto-clients -y
+
+# Run the simulator
 python3 examples/mqtt-simulator.py --host localhost
-
-# Check InfluxDB
-curl "http://localhost:8086/query?db=iiot" --data-urlencode "q=SELECT * FROM environment ORDER BY time DESC LIMIT 5"
-
-# Open Grafana: http://localhost:3000
 ```
 
-## Auto-Created Dashboards
+For non-Debian systems: `pip install paho-mqtt --break-system-packages` or use a venv.
 
-When you open the Web UI and click "Auto-Create Dashboards," the backend:
-1. Discovers all measurements in InfluxDB
-2. Creates a Grafana dashboard per measurement
-3. Each dashboard includes time-series graphs, stat panels, and device/reading filters
+---
 
-You can also manually create dashboards via the Grafana UI — the InfluxDB datasource is pre-configured.
+## Managing Everything from Web UI
 
-## Directory Structure
+| Task | Where |
+|------|-------|
+| Add MQTT broker | 📡 Readers → + Add Reader |
+| Add sensor | 🔍 Sensors → select reader → + Add Sensor |
+| Edit sensor | 🔍 Sensors → ✏️ on sensor row |
+| Delete sensor | 🔍 Sensors → 🗑️ on sensor row |
+| View last 50 readings | 📊 Dashboard |
+| Auto-create Grafana dashboards | 📊 Dashboard → ✨ Auto-Create |
+| Open Grafana | 📈 Grafana |
+| Update settings | ⚡ Settings |
 
+---
+
+## Raspberry Pi
+
+```bash
+# Flash Raspberry Pi OS (64-bit) to SD card, boot, SSH in, then:
+curl -fsSL https://raw.githubusercontent.com/Sandun-S/industrial_iot_observability_stack_deploy/main/scripts/setup.sh | bash
 ```
-├── stack.yml              # Docker Swarm stack (production)
-├── docker-compose.yml     # Docker Compose (single host / dev)
-├── config/
-│   └── mqtt-reader-example.yaml  # Example reader config
-├── grafana/
-│   ├── provisioning/
-│   │   ├── datasources/influxdb.yaml      # Auto InfluxDB datasource
-│   │   └── dashboards/
-│   │       ├── dashboard-provider.yaml    # Dashboard loader
-│   │       └── iiot-overview.json         # Pre-built dashboard
-│   └── grafana.ini        # Grafana config (anonymous access)
-├── scripts/
-│   ├── setup.sh           # One-command full setup
-│   ├── deploy.sh          # Redeploy after config changes
-│   └── add-reader.sh      # Add new MQTT reader
-├── examples/
-│   ├── mqtt-simulator.py  # Test data publisher
-│   └── temperature-sensor.yaml
-├── README.md
-├── ARCHITECTURE.md
-└── TROUBLESHOOTING.md
-```
+
+Docker gets installed, Swarm initialized, stack deployed. Works on Pi 3, 4, and 5.
+
+---
 
 ## Updating
 
 ```bash
+cd industrial_iot_observability_stack_deploy
 git pull
 ./scripts/deploy.sh
 ```
 
-## License
+---
 
-MIT — see [LICENSE](LICENSE) file.
+## Architecture
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full component and data flow documentation.
 
 ---
 
-**Source code:** [github.com/Sandun-S/industrial-iot-observability-stack](https://github.com/Sandun-S/industrial-iot-observability-stack)
+**Source code:** [industrial_iot_observability_stack](https://github.com/Sandun-S/industrial_iot_observability_stack)

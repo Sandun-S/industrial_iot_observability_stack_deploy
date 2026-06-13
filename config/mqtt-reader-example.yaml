@@ -1,39 +1,107 @@
-# MQTT Reader — Example Configuration
-# 
-# This is the default reader config that ships with the IIoT stack.
-# It subscribes to a test topic and writes to the "environment" measurement.
-# Edit this file to match your MQTT broker and sensors, or add new config files.
-#
-# For multiple MQTT brokers, create separate config files and add corresponding
-# reader services to your stack.yml or docker-compose.yml.
-
 reader:
-  name: "example-reader"
-  description: "Example MQTT reader for testing — modify for your use case"
-
+  name: example-reader
+  description: Example MQTT reader for temperature and humidity sensors
 mqtt:
-  broker: "tcp://mosquitto:1883"
-  client_id: "iiot-example-01"
+  broker: tcp://mosquitto:1883
+  client_id: iiot-example-01
   qos: 1
-  username: ""
-  password: ""
+  username: ''
+  password: ''
   reconnect_delay: 10
-
 influxdb:
-  url: "http://influxdb:8086"
-  database: "iiot"
-  username: ""
-  password: ""
-
+  url: http://influxdb:8086
+  database: iiot
+  username: ''
+  password: ''
 sensors:
-  # Test sensor — publishes to iiot/test topic. Replace with your own sensors.
-  - name: "Test Sensor"
-    topic: "iiot/test"
-    measurement: "environment"
-    fields:
-      - key: "value"
-        json_path: "value"
-        type: float
-        unit: ""
-    tags:
-      location: "test"
+- name: Test Sensor
+  topic: iiot/test
+  measurement: environment
+  fields:
+  - key: value
+    json_path: value
+    type: float
+    unit: ''
+  tags:
+    location: test
+- name: Server Room Temperature
+  topic: sensors/server-room/temperature
+  measurement: environment
+  fields:
+  - key: temperature_c
+    json_path: temperature
+    type: float
+    unit: °C
+  tags:
+    location: server-room
+    building: main
+- name: HVAC Unit 1
+  topic: hvac/unit-01/status
+  measurement: hvac
+  fields:
+  - key: supply_temp_c
+    json_path: supply_temp
+    type: float
+    unit: °C
+  - key: return_temp_c
+    json_path: return_temp
+    type: float
+    unit: °C
+  - key: fan_speed_pct
+    json_path: fan_speed
+    type: float
+    unit: '%'
+  - key: filter_status
+    json_path: filter_status
+    type: string
+  tags:
+    equipment: hvac-01
+    location: rooftop
+- name: Server Room Humidity
+  topic: sensors/server-room/humidity
+  measurement: environment
+  fields:
+  - key: humidity_pct
+    json_path: humidity
+    type: float
+    unit: '%'
+  tags:
+    location: server-room
+    building: main
+- name: Power Meter Main
+  topic: power/main-meter/values
+  measurement: power
+  csv:
+    delimiter: ','
+    skip_header: false
+    columns:
+    - key: voltage_v
+      index: 0
+      type: float
+      unit: V
+    - key: current_a
+      index: 1
+      type: float
+      unit: A
+    - key: power_w
+      index: 2
+      type: float
+      unit: W
+    - key: energy_kwh
+      index: 3
+      type: float
+      unit: kWh
+  tags:
+    meter_id: PM-001
+    panel: main
+- name: Multi-Sensor Array
+  topic: sensors/+/temperature
+  measurement: environment
+  fields:
+  - key: temperature_c
+    json_path: temperature
+    type: float
+    unit: °C
+  tags:
+    sensor_id: '{{topic.1}}'
+    location: warehouse
