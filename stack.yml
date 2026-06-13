@@ -1,0 +1,169 @@
+# Industrial IoT Observability Stack — Docker Swarm Stack
+#
+# Deploy with: docker stack deploy -c stack.yml iiot
+#
+# This stack deploys the full IIoT observability pipeline:
+#   MQTT → MQTT Reader → InfluxDB → Grafana (+ Web UI)
+#
+# For single-host setups (no Swarm), use docker-compose.yml instead.
+
+version: "3.8"
+
+networks:
+  iiot-net:
+    driver: overlay
+    attachable: true
+
+volumes:
+  influxdb-data:
+  grafana-data:
+  mosquitto-data:
+
+configs:
+  mqtt-reader-example:
+    file: ./config/mqtt-reader-example.yaml
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    networks:
+      - iiot-net
+    ports:
+      - target: 1883
+        published: 1883
+        protocol: tcp
+        mode: host
+      - target: 9001
+        published: 9001
+        protocol: tcp
+        mode: host
+    volumes:
+      - mosquitto-data:/mosquitto/data
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          memory: 128M
+      restart_policy:
+        condition: any
+
+  influxdb:
+    image: influxdb:1.8
+    networks:
+      - iiot-net
+    ports:
+      - target: 8086
+        published: 8086
+        protocol: tcp
+        mode: host
+    volumes:
+      - influxdb-data:/var/lib/influxdb
+    environment:
+      INFLUXDB_DB: iiot
+      INFLUXDB_ADMIN_ENABLED: "true"
+      INFLUXDB_HTTP_AUTH_ENABLED: "false"
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          memory: 256M
+      restart_policy:
+        condition: any
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8086/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:latest
+    networks:
+      - iiot-net
+    ports:
+      - target: 3000
+        published: 3000
+        protocol: tcp
+        mode: host
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          memory: 256M
+      restart_policy:
+        condition: any
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  web-ui:
+    image: ghcr.io/sandun-s/industrial-iot-observability-stack/web-ui:latest
+    networks:
+      - iiot-net
+    ports:
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config:/configs:rw
+    environment:
+      PORT: "8080"
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_DB: iiot
+      GRAFANA_URL: http://grafana:3000
+      GRAFANA_SERVICE_ACCOUNT_TOKEN: ""
+      CONFIG_DIR: /configs
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          memory: 128M
+      restart_policy:
+        condition: any
+
+  mqtt-reader-example:
+    image: ghcr.io/sandun-s/industrial-iot-observability-stack/mqtt-reader:latest
+    networks:
+      - iiot-net
+    configs:
+      - source: mqtt-reader-example
+        target: /config/reader.yaml
+    environment:
+      CONFIG_PATH: /config/reader.yaml
+      LOG_LEVEL: info
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          memory: 64M
+      restart_policy:
+        condition: any
+    depends_on:
+      - influxdb

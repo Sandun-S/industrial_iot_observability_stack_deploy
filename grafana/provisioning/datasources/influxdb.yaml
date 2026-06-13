@@ -1,0 +1,14 @@
+# Grafana Provisioning — InfluxDB Datasource
+# Auto-configures the InfluxDB v1 datasource on Grafana startup.
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    database: iiot
+    isDefault: true
+    jsonData:
+      httpMode: GET
+    editable: true

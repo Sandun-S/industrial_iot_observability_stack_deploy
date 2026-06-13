@@ -1,0 +1,102 @@
+# Industrial IoT Observability Stack — Docker Compose (Single Host)
+#
+# For development or single-host production without Docker Swarm.
+# Deploy with: docker compose up -d
+#
+# For multi-node deployments, use stack.yml with Docker Swarm instead.
+
+version: "3.8"
+
+networks:
+  iiot-net:
+    driver: bridge
+
+volumes:
+  influxdb-data:
+  grafana-data:
+  mosquitto-data:
+
+services:
+  # ── MQTT Broker ─────────────────────────────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2
+    networks:
+      - iiot-net
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - mosquitto-data:/mosquitto/data
+    restart: unless-stopped
+
+  # ── InfluxDB v1.8 ───────────────────────────────────────────────────────
+  influxdb:
+    image: influxdb:1.8
+    networks:
+      - iiot-net
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb
+    environment:
+      INFLUXDB_DB: iiot
+      INFLUXDB_ADMIN_ENABLED: "true"
+      INFLUXDB_HTTP_AUTH_ENABLED: "false"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8086/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Grafana ─────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    networks:
+      - iiot-net
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    restart: unless-stopped
+
+  # ── Web UI Backend ──────────────────────────────────────────────────────
+  web-ui:
+    image: ghcr.io/sandun-s/industrial-iot-observability-stack/web-ui:latest
+    networks:
+      - iiot-net
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config:/configs:rw
+    environment:
+      PORT: "8080"
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_DB: iiot
+      GRAFANA_URL: http://grafana:3000
+      GRAFANA_SERVICE_ACCOUNT_TOKEN: ""
+      CONFIG_DIR: /configs
+    restart: unless-stopped
+
+  # ── MQTT Reader: Example ────────────────────────────────────────────────
+  mqtt-reader-example:
+    image: ghcr.io/sandun-s/industrial-iot-observability-stack/mqtt-reader:latest
+    networks:
+      - iiot-net
+    volumes:
+      - ./config/mqtt-reader-example.yaml:/config/reader.yaml:ro
+    environment:
+      CONFIG_PATH: /config/reader.yaml
+      LOG_LEVEL: info
+    restart: unless-stopped
+    depends_on:
+      influxdb:
+        condition: service_healthy

@@ -1,0 +1,39 @@
+# MQTT Reader — Example Configuration
+# 
+# This is the default reader config that ships with the IIoT stack.
+# It subscribes to a test topic and writes to the "environment" measurement.
+# Edit this file to match your MQTT broker and sensors, or add new config files.
+#
+# For multiple MQTT brokers, create separate config files and add corresponding
+# reader services to your stack.yml or docker-compose.yml.
+
+reader:
+  name: "example-reader"
+  description: "Example MQTT reader for testing — modify for your use case"
+
+mqtt:
+  broker: "tcp://mosquitto:1883"
+  client_id: "iiot-example-01"
+  qos: 1
+  username: ""
+  password: ""
+  reconnect_delay: 10
+
+influxdb:
+  url: "http://influxdb:8086"
+  database: "iiot"
+  username: ""
+  password: ""
+
+sensors:
+  # Test sensor — publishes to iiot/test topic. Replace with your own sensors.
+  - name: "Test Sensor"
+    topic: "iiot/test"
+    measurement: "environment"
+    fields:
+      - key: "value"
+        json_path: "value"
+        type: float
+        unit: ""
+    tags:
+      location: "test"

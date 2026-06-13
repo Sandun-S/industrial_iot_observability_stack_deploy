@@ -1,0 +1,114 @@
+{
+  "dashboard": {
+    "title": "IIoT Overview",
+    "tags": ["iiot", "overview"],
+    "timezone": "browser",
+    "refresh": "10s",
+    "schemaVersion": 36,
+    "panels": [
+      {
+        "id": 1,
+        "type": "row",
+        "title": "Overview",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "type": "timeseries",
+        "title": "Readings Over Time",
+        "gridPos": {"h": 12, "w": 24, "x": 0, "y": 1},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "influxdb", "uid": "InfluxDB"},
+            "query": "SELECT * FROM \"$measurement\" WHERE $timeFilter AND \"device\" =~ /^$device$/ AND \"reading\" =~ /^$reading$/",
+            "rawQuery": true,
+            "resultFormat": "time_series"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "fillOpacity": 10,
+              "showPoints": "auto"
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "type": "stat",
+        "title": "Latest Value",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 13},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "influxdb", "uid": "InfluxDB"},
+            "query": "SELECT * FROM \"$measurement\" WHERE \"device\" =~ /^$device$/ AND \"reading\" =~ /^$reading$/ ORDER BY time DESC LIMIT 1",
+            "rawQuery": true,
+            "resultFormat": "time_series"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 4,
+        "type": "table",
+        "title": "Latest Readings (All Devices)",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 17},
+        "targets": [
+          {
+            "refId": "A",
+            "datasource": {"type": "influxdb", "uid": "InfluxDB"},
+            "query": "SELECT * FROM \"$measurement\" ORDER BY time DESC LIMIT 100",
+            "rawQuery": true,
+            "resultFormat": "table"
+          }
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "measurement",
+          "type": "query",
+          "datasource": {"type": "influxdb", "uid": "InfluxDB"},
+          "query": "SHOW MEASUREMENTS",
+          "refresh": 1,
+          "multi": false,
+          "includeAll": false,
+          "label": "Measurement",
+          "current": {"text": "environment", "value": "environment"}
+        },
+        {
+          "name": "device",
+          "type": "query",
+          "datasource": {"type": "influxdb", "uid": "InfluxDB"},
+          "query": "SHOW TAG VALUES FROM \"$measurement\" WITH KEY = \"device\"",
+          "refresh": 1,
+          "multi": true,
+          "includeAll": true,
+          "label": "Device"
+        },
+        {
+          "name": "reading",
+          "type": "query",
+          "datasource": {"type": "influxdb", "uid": "InfluxDB"},
+          "query": "SHOW TAG VALUES FROM \"$measurement\" WITH KEY = \"reading\"",
+          "refresh": 1,
+          "multi": true,
+          "includeAll": true,
+          "label": "Reading"
+        }
+      ]
+    }
+  },
+  "overwrite": false
+}

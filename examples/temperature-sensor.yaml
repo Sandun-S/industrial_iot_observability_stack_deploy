@@ -1,0 +1,63 @@
+# Example: Temperature & Humidity Monitoring
+#
+# This config subscribes to temperature and humidity topics
+# and writes data to the "environment" measurement in InfluxDB.
+
+reader:
+  name: "temperature-monitor"
+  description: "Temperature and humidity sensors across the facility"
+
+mqtt:
+  broker: "tcp://mosquitto:1883"
+  client_id: "iiot-temp-monitor-01"
+  qos: 1
+  username: ""
+  password: ""
+  reconnect_delay: 10
+
+influxdb:
+  url: "http://influxdb:8086"
+  database: "iiot"
+  username: ""
+  password: ""
+
+sensors:
+  # Server room temperature sensor
+  - name: "Server Room Temperature"
+    topic: "sensors/server-room/temperature"
+    measurement: "environment"
+    fields:
+      - key: "temperature_c"
+        json_path: "temperature"
+        type: float
+        unit: "°C"
+    tags:
+      location: "server-room"
+      building: "main"
+      floor: "1"
+
+  # Server room humidity sensor
+  - name: "Server Room Humidity"
+    topic: "sensors/server-room/humidity"
+    measurement: "environment"
+    fields:
+      - key: "humidity_pct"
+        json_path: "humidity"
+        type: float
+        unit: "%"
+    tags:
+      location: "server-room"
+      building: "main"
+
+  # Warehouse temperature (wildcard — matches sensors/warehouse-1/temperature, sensors/warehouse-2/temperature, etc.)
+  - name: "Warehouse Temperature"
+    topic: "sensors/+/temperature"
+    measurement: "environment"
+    fields:
+      - key: "temperature_c"
+        json_path: "value"
+        type: float
+        unit: "°C"
+    tags:
+      sensor_id: "{{topic.1}}"      # extracts warehouse-1, warehouse-2, etc.
+      location: "warehouse"
