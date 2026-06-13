@@ -1,5 +1,7 @@
 # Industrial IoT Observability Stack
 
+[![GitHub release](https://img.shields.io/github/v/release/Sandun-S/industrial_iot_observability_stack)](https://github.com/Sandun-S/industrial_iot_observability_stack/releases)
+
 **Turn MQTT sensor data into live Grafana dashboards — in one command.**
 
 This is an open-source observability stack for industrial IoT and homelab use. Connect any MQTT-enabled device or sensor, and within minutes you'll have time-series storage, auto-generated dashboards, and a web UI to manage everything — no cloud, no vendor lock-in, no monthly fees.
